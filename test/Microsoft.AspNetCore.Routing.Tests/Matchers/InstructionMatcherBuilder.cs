@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.AspNetCore.Routing.EndpointConstraints;
 using Microsoft.AspNetCore.Routing.Template;
 using static Microsoft.AspNetCore.Routing.Matchers.InstructionMatcher;
 
@@ -11,38 +12,17 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 {
     internal class InstructionMatcherBuilder : MatcherBuilder
     {
-        private List<Entry> _entries = new List<Entry>();
+        private List<MatcherBuilderEntry> _entries = new List<MatcherBuilderEntry>();
 
         public override void AddEndpoint(MatcherEndpoint endpoint)
         {
             var parsed = TemplateParser.Parse(endpoint.Template);
-            _entries.Add(new Entry()
-            {
-                Order = 0,
-                Pattern = parsed,
-                Precedence = RoutePrecedence.ComputeInbound(parsed),
-                Endpoint = endpoint,
-            });
+            _entries.Add(new MatcherBuilderEntry(endpoint));
         }
 
         public override Matcher Build()
         {
-            _entries.Sort((x, y) =>
-            {
-                var comparison = x.Order.CompareTo(y.Order);
-                if (comparison != 0)
-                {
-                    return comparison;
-                }
-
-                comparison = x.Precedence.CompareTo(y.Precedence);
-                if (comparison != 0)
-                {
-                    return comparison;
-                }
-
-                return x.Pattern.TemplateText.CompareTo(y.Pattern.TemplateText);
-            });
+            _entries.Sort();
 
             var roots = new List<OrderNode>();
 
@@ -58,12 +38,13 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                     var segment = entry.Pattern.Segments[depth];
                     if (segment.IsSimple && segment.Parts[0].IsLiteral)
                     {
+                        var text = segment.Parts[0].Text;
                         var branch = parent.GetNode<BranchNode>() ?? parent.AddNode(new BranchNode(depth));
 
                         var index = -1;
                         for (var j = 0; j < branch.Literals.Count; j++)
                         {
-                            if (string.Equals(segment.Parts[0].Text, branch.Literals[j], StringComparison.OrdinalIgnoreCase))
+                            if (string.Equals(text, branch.Literals[j], StringComparison.OrdinalIgnoreCase))
                             {
                                 index = j;
                                 break;
@@ -72,7 +53,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
                         if (index == -1)
                         {
-                            branch.Literals.Add(segment.Parts[0].Text);
+                            branch.Literals.Add(text);
                             branch.AddNode(new SequenceNode(depth + 1));
                             index = branch.Children.Count - 1;
                         }
@@ -81,13 +62,17 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                     }
                     else if (segment.IsSimple && segment.Parts[0].IsParameter)
                     {
-                        var parameter = parent.GetNode<ParameterNode>() ?? parent.AddNode(new ParameterNode(depth));
-                        if (parameter.Children.Count == 0)
+                        var branch = parent.GetNode<BranchNode>() ?? parent.AddNode(new BranchNode(depth));
+
+                        var parameter = branch.GetNode<ParameterNode>();
+                        if (parameter == null)
                         {
-                            parameter.AddNode(new SequenceNode(depth + 1));
+                            parameter = new ParameterNode(depth + 1);
+                            branch.AddNode(parameter);
+                            branch.Literals.Add(null);
                         }
 
-                        parent = (SequenceNode)parameter.Children[0];
+                        parent = (SequenceNode)parameter;
                     }
                     else
                     {
@@ -139,21 +124,31 @@ namespace Microsoft.AspNetCore.Routing.Matchers
         private static Candidate CreateCandidate(MatcherEndpoint endpoint)
         {
             var parsed = TemplateParser.Parse(endpoint.Template);
-            return new Candidate()
+
+            var processors = new List<MatchProcessor>();
+            for (var i = 0; i < parsed.Segments.Count; i++)
             {
-                Endpoint = endpoint,
-                Parameters = parsed.Segments.Select(s => s.IsSimple && s.Parts[0].IsParameter ? s.Parts[0].Name : null).ToArray(),
-            };
-        }
+                var segment = parsed.Segments[i];
+                if (segment.IsSimple && segment.Parts[0].IsParameter)
+                {
+                    var processor = new ParameterSegmentMatchProcessor(
+                        i,
+                        segment.Parts[0].Name,
+                        segment.Parts[0].IsCatchAll,
+                        segment.Parts[0].IsCatchAll || segment.Parts[0].DefaultValue != null,
+                        segment.Parts[0].DefaultValue);
+                    processors.Add(processor);
+                }
+            }
 
-        private class Entry
-        {
-            public int Order;
-            public decimal Precedence;
-            public RouteTemplate Pattern;
-            public MatcherEndpoint Endpoint;
-        }
+            var httpMethod = endpoint.Metadata.GetMetadata<HttpMethodEndpointConstraint>()?.HttpMethods.SingleOrDefault();
+            if (httpMethod != null)
+            {
+                processors.Insert(0, new HttpMethodMatchProcessor(httpMethod));
+            }
 
+            return new Candidate(endpoint, processors.ToArray());
+        }
         private class InstructionBuilder
         {
             private readonly List<Instruction> _instructions = new List<Instruction>();
@@ -276,6 +271,18 @@ namespace Microsoft.AspNetCore.Routing.Matchers
             }
 
             public int Order { get; }
+
+            public override void Lower(InstructionBuilder builder)
+            {
+                builder.BeginBlock();
+
+                for (var i = 0; i < Children.Count; i++)
+                {
+                    Children[i].Lower(builder);
+                }
+
+                builder.EndBlock();
+            }
         }
 
         private class BranchNode : Node
@@ -289,7 +296,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
             public override void Lower(InstructionBuilder builder)
             {
-                var table = new JumpTableBuilder() { Depth = Depth, };
+                var table = new JumpTableBuilder() { Default = -1, Exit = -1, };
                 var index = builder.AddJumpTable(table);
                 builder.AddInstruction(new Instruction()
                 {
@@ -302,33 +309,44 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
                 for (var i = 0; i < Children.Count; i++)
                 {
-                    table.AddEntry(Literals[i], builder.Next);
-                    Children[i].Lower(builder);
-                    builder.AddInstruction(new Instruction()
+                    if (Literals[i] != null)
                     {
-                        Code = InstructionCode.Pop,
-                        Depth = (byte)Depth,
-                    });
+                        table.AddEntry(Literals[i], builder.Next);
+                        Children[i].Lower(builder);
+                        builder.AddInstruction(new Instruction()
+                        {
+                            Code = InstructionCode.Pop,
+                            Depth = (byte)Depth,
+                        });
+                    }
+                    else
+                    {
+                        table.Default = builder.Next;
+                        Children[i].Lower(builder);
+                        builder.AddInstruction(new Instruction()
+                        {
+                            Code = InstructionCode.Pop,
+                            Depth = (byte)Depth,
+                        });
+                    }
                 }
 
                 builder.EndBlock();
+
+                if (table.Default == -1)
+                {
+                    table.Default = builder.Next;
+                }
+
                 table.Exit = builder.Next;
             }
         }
 
-        private class ParameterNode : Node
+        private class ParameterNode : SequenceNode
         {
             public ParameterNode(int depth)
+                : base(depth)
             {
-                Depth = depth;
-            }
-
-            public override void Lower(InstructionBuilder builder)
-            {
-                for (var i = 0; i < Children.Count; i++)
-                {
-                    Children[i].Lower(builder);
-                }
             }
         }
 

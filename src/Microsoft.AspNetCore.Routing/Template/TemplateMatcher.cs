@@ -258,7 +258,7 @@ namespace Microsoft.AspNetCore.Routing.Template
             return true;
         }
 
-        private bool MatchComplexSegment(
+        internal static bool MatchComplexSegment(
             TemplateSegment routeSegment,
             string requestSegment,
             IReadOnlyDictionary<string, object> defaults,
@@ -278,7 +278,7 @@ namespace Microsoft.AspNetCore.Routing.Template
             if (routeSegment.Parts[indexOfLastSegment].IsOptional &&
                 routeSegment.Parts[indexOfLastSegment - 1].IsOptionalSeperator)
             {
-                if (MatchComplexSegmentCore(routeSegment, requestSegment, Defaults, values, indexOfLastSegment))
+                if (MatchComplexSegmentCore(routeSegment, requestSegment, defaults, values, indexOfLastSegment))
                 {
                     return true;
                 }
@@ -294,18 +294,18 @@ namespace Microsoft.AspNetCore.Routing.Template
                     return MatchComplexSegmentCore(
                         routeSegment,
                         requestSegment,
-                        Defaults,
+                        defaults,
                         values,
                         indexOfLastSegment - 2);
                 }
             }
             else
             {
-                return MatchComplexSegmentCore(routeSegment, requestSegment, Defaults, values, indexOfLastSegment);
+                return MatchComplexSegmentCore(routeSegment, requestSegment, defaults, values, indexOfLastSegment);
             }
         }
 
-        private bool MatchComplexSegmentCore(
+        private static bool MatchComplexSegmentCore(
             TemplateSegment routeSegment,
             string requestSegment,
             IReadOnlyDictionary<string, object> defaults,

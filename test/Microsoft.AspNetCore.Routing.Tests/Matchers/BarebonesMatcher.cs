@@ -33,7 +33,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
             for (var i = 0; i < _matchers.Length; i++)
             {
-                if (_matchers[i].TryMatch(httpContext, feature))
+                if (_matchers[i].TryMatch(httpContext))
                 {
                     feature.Endpoint = _matchers[i]._endpoint;
                     feature.Values = new RouteValueDictionary();
@@ -47,19 +47,30 @@ namespace Microsoft.AspNetCore.Routing.Matchers
         {
             private readonly string[] _segments;
             public readonly MatcherEndpoint _endpoint;
+            private readonly Candidate[] _candidates;
+            private readonly int[] _candidateIndices;
+            private readonly int[] _candidateGroups;
 
             public InnerMatcher(string[] segments, MatcherEndpoint endpoint)
             {
                 _segments = segments;
                 _endpoint = endpoint;
+
+                _candidates = new Candidate[]
+                {
+                    new Candidate(endpoint, Array.Empty<MatchProcessor>()),
+                };
+
+                _candidateIndices = new int[] { 0, };
+                _candidateGroups = new int[] { 1, };
             }
 
-            public bool TryMatch(HttpContext httpContext, IEndpointFeature feature)
+            public bool TryMatch(HttpContext httpContext)
             {
                 var segment = 0;
 
                 var path = httpContext.Request.Path.Value;
-                
+
                 var start = 1; // PathString always has a leading slash
                 var end = 0;
                 while ((end = path.IndexOf('/', start)) >= 0)
@@ -67,7 +78,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                     var comparand = _segments.Length > segment ? _segments[segment] : null;
                     if ((comparand == null && end - start == 0) ||
                         (comparand != null &&
-                            (comparand.Length != end - start || 
+                            (comparand.Length != end - start ||
                             string.Compare(
                                 path,
                                 start,
@@ -78,7 +89,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                     {
                         return false;
                     }
-                    
+
                     start = end + 1;
                     segment++;
                 }
@@ -107,9 +118,19 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                 return segment == _segments.Length;
             }
 
+            internal void SelectCandidates(HttpContext httpContext, ref CandidateSet candidates)
+            {
+                if (TryMatch(httpContext))
+                {
+                    candidates.Candidates = _candidates;
+                    candidates.CandidateIndices = _candidateIndices;
+                    candidates.CandidateGroups = _candidateGroups;
+                }
+            }
+
             public override Task MatchAsync(HttpContext httpContext, IEndpointFeature feature)
             {
-                if (TryMatch(httpContext, feature))
+                if (TryMatch(httpContext))
                 {
                     feature.Endpoint = _endpoint;
                     feature.Values = new RouteValueDictionary();

@@ -1,19 +1,17 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System.Threading.Tasks;
+using System;
 using BenchmarkDotNet.Attributes;
 using Microsoft.AspNetCore.Http;
 
 namespace Microsoft.AspNetCore.Routing.Matchers
 {
-    public class SmallEntryCountLiteralMatcherBenchark : MatcherBenchmarkBase
+    public class MatcherSelectCandidatesSmallEntryCountBenchmark : MatcherBenchmarkBase
     {
-        private Matcher _baseline;
-        private Matcher _dfa;
-        private Matcher _instruction;
-        private Matcher _route;
-        private Matcher _tree;
+        private MatcherBase _baseline;
+        private MatcherBase _dfa;
+        private MatcherBase _instruction;
 
         private EndpointFeature _feature;
 
@@ -24,11 +22,9 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
             SetupRequests();
 
-            _baseline = SetupMatcher(new TrivialMatcherBuilder());
-            _dfa = SetupMatcher(new DfaMatcherBuilder());
-            _instruction = SetupMatcher(new InstructionMatcherBuilder());
-            _route = SetupMatcher(new RouteMatcherBuilder());
-            _tree = SetupMatcher(new TreeRouterMatcherBuilder());
+            _baseline = (MatcherBase)SetupMatcher(new TrivialMatcherBuilder());
+            _dfa = (MatcherBase)SetupMatcher(new DfaMatcherBuilder());
+            _instruction = (MatcherBase)SetupMatcher(new InstructionMatcherBuilder());
 
             _feature = new EndpointFeature();
         }
@@ -74,51 +70,49 @@ namespace Microsoft.AspNetCore.Routing.Matchers
         }
 
         [Benchmark(Baseline = true)]
-        public async Task Baseline()
+        public unsafe void Baseline()
         {
-            var feature = _feature;
-            await _baseline.MatchAsync(_requests[0], feature);
-            Validate(_requests[0], _endpoints[9], feature.Endpoint);
+            var httpContext = _requests[0];
+            var path = httpContext.Request.Path.Value;
+            var segments = new ReadOnlySpan<PathSegment>(Array.Empty<PathSegment>());
+
+            var candidates = new CandidateSet(path, segments);
+            _baseline.SelectCandidates(httpContext, ref candidates);
+
+            var endpoint = candidates.Candidates[candidates.CandidateIndices[0]].Endpoint;
+            Validate(_requests[0], _endpoints[9], endpoint);
         }
 
         [Benchmark]
-        public async Task Dfa()
+        public unsafe void Dfa()
         {
-            var feature = _feature;
-            await _dfa.MatchAsync(_requests[0], feature);
-            Validate(_requests[0], _endpoints[9], feature.Endpoint);
+            var httpContext = _requests[0];
+            var path = httpContext.Request.Path.Value;
+            var buffer = stackalloc PathSegment[32];
+            var count = FastPathTokenizer.Tokenize(path, buffer, 32);
+            var segments = new ReadOnlySpan<PathSegment>((void*)buffer, count);
+
+            var candidates = new CandidateSet(path, segments);
+            _dfa.SelectCandidates(httpContext, ref candidates);
+
+            var endpoint = candidates.Candidates[candidates.CandidateIndices[0]].Endpoint;
+            Validate(_requests[0], _endpoints[9], endpoint);
         }
 
         [Benchmark]
-        public async Task Instruction()
+        public unsafe void Instruction()
         {
-            var feature = _feature;
-            await _instruction.MatchAsync(_requests[0], feature);
-            Validate(_requests[0], _endpoints[9], feature.Endpoint);
-        }
+            var httpContext = _requests[0];
+            var path = httpContext.Request.Path.Value;
+            var buffer = stackalloc PathSegment[32];
+            var count = FastPathTokenizer.Tokenize(path, buffer, 32);
+            var segments = new ReadOnlySpan<PathSegment>((void*)buffer, count);
 
-        [Benchmark]
-        public async Task LegacyRoute()
-        {
-            var feature = _feature;
+            var candidates = new CandidateSet(path, segments);
+            _instruction.SelectCandidates(httpContext, ref candidates);
 
-            // This is required to make the legacy router implementation work with dispatcher.
-            _requests[0].Features.Set<IEndpointFeature>(feature);
-
-            await _route.MatchAsync(_requests[0], feature);
-            Validate(_requests[0], _endpoints[9], feature.Endpoint);
-        }
-
-        [Benchmark]
-        public async Task LegacyTreeRouter()
-        {
-            var feature = _feature;
-
-            // This is required to make the legacy router implementation work with dispatcher.
-            _requests[0].Features.Set<IEndpointFeature>(feature);
-
-            await _tree.MatchAsync(_requests[0], feature);
-            Validate(_requests[0], _endpoints[9], feature.Endpoint);
+            var endpoint = candidates.Candidates[candidates.CandidateIndices[0]].Endpoint;
+            Validate(_requests[0], _endpoints[9], endpoint);
         }
     }
 }
