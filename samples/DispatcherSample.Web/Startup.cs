@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -31,7 +32,13 @@ namespace DispatcherSample.Web
                             response.ContentLength = payloadLength;
                             return response.Body.WriteAsync(_homePayload, 0, payloadLength);
                         },
-                        "/", new RouteValueDictionary(), new RouteValueDictionary(), 0, EndpointMetadataCollection.Empty, "Home"),
+                        "/",
+                        new RouteValueDictionary(),
+                        new RouteValueDictionary(),
+                        new Dictionary<string, IEndpointMatchConstraint>(),
+                        0,
+                        EndpointMetadataCollection.Empty,
+                        "Home"),
                     new MatcherEndpoint((next) => (httpContext) =>
                         {
                             var response = httpContext.Response;
@@ -41,7 +48,13 @@ namespace DispatcherSample.Web
                             response.ContentLength = payloadLength;
                             return response.Body.WriteAsync(_helloWorldPayload, 0, payloadLength);
                         },
-                        "/plaintext", new RouteValueDictionary(), new RouteValueDictionary(), 0, EndpointMetadataCollection.Empty, "Plaintext"),
+                        "/plaintext",
+                        new RouteValueDictionary(),
+                        new RouteValueDictionary(),
+                        new Dictionary<string, IEndpointMatchConstraint>(),
+                        0,
+                        EndpointMetadataCollection.Empty,
+                        "Plaintext"),
                 }));
             });
         }

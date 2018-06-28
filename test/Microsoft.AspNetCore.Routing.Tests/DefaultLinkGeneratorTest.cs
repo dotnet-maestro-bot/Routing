@@ -788,6 +788,7 @@ namespace Microsoft.AspNetCore.Routing
                 template,
                 defaults,
                 new RouteValueDictionary(),
+                new Dictionary<string, IEndpointMatchConstraint>(),
                 0,
                 EndpointMetadataCollection.Empty,
                 null);

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing.Template;
@@ -20,6 +21,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
             string template,
             RouteValueDictionary defaults,
             RouteValueDictionary requiredValues,
+            IDictionary<string, IEndpointMatchConstraint> endpointMatchConstraints,
             int order,
             EndpointMetadataCollection metadata,
             string displayName)
@@ -44,6 +46,8 @@ namespace Microsoft.AspNetCore.Routing.Matchers
             RequiredValues = requiredValues;
             var mergedDefaults = GetDefaults(ParsedTemplate, defaults);
             Defaults = mergedDefaults;
+
+
         }
 
         public int Order { get; }
@@ -56,6 +60,8 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
         // Todo: needs review
         public RouteTemplate ParsedTemplate { get; }
+
+        public IDictionary<string, IEndpointMatchConstraint> EndpointMatchConstraints { get; }
 
         // Merge inline and non inline defaults into one
         private RouteValueDictionary GetDefaults(RouteTemplate parsedTemplate, RouteValueDictionary nonInlineDefaults)

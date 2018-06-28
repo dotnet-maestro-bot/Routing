@@ -16,12 +16,19 @@ namespace Microsoft.AspNetCore.Routing.Matchers
         private MatcherEndpoint CreateEndpoint(string template, int order, object defaultValues = null, EndpointMetadataCollection metadata = null)
         {
             var defaults = defaultValues == null ? new RouteValueDictionary() : new RouteValueDictionary(defaultValues);
-            return new MatcherEndpoint((next) => null, template, defaults, new RouteValueDictionary(), order, metadata ?? EndpointMetadataCollection.Empty, template);
+            return new MatcherEndpoint(
+                (next) => null,
+                template, defaults,
+                new RouteValueDictionary(),
+                new Dictionary<string, IEndpointMatchConstraint>(),
+                order,
+                metadata ?? EndpointMetadataCollection.Empty,
+                template);
         }
 
         private TreeMatcher CreateTreeMatcher(EndpointDataSource endpointDataSource)
         {
-            var compositeDataSource = new CompositeEndpointDataSource(new[] { endpointDataSource });
+            var compositeDataSource = new CompositeEndpointDataSource(new[] { endpointDataSource }, Options.Create(new DispatcherOptions()));
             var defaultInlineConstraintResolver = new DefaultInlineConstraintResolver(Options.Create(new RouteOptions()));
             var endpointSelector = new EndpointSelector(
                 compositeDataSource,

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Options;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -416,7 +417,9 @@ namespace Microsoft.AspNetCore.Routing.EndpointConstraints
         {
             loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
 
-            var endpointDataSource = new CompositeEndpointDataSource(new[] { new DefaultEndpointDataSource(actions) });
+            var endpointDataSource = new CompositeEndpointDataSource(
+                new[] { new DefaultEndpointDataSource(actions) },
+                Options.Create(new DispatcherOptions()));
 
             var actionConstraintProviders = new IEndpointConstraintProvider[] {
                     new DefaultEndpointConstraintProvider(),
@@ -448,7 +451,7 @@ namespace Microsoft.AspNetCore.Routing.EndpointConstraints
         private static EndpointConstraintCache GetEndpointConstraintCache(IEndpointConstraintProvider[] actionConstraintProviders = null)
         {
             return new EndpointConstraintCache(
-                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>()),
+                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>(), Options.Create(new DispatcherOptions())),
                 actionConstraintProviders.AsEnumerable() ?? new List<IEndpointConstraintProvider>());
         }
 

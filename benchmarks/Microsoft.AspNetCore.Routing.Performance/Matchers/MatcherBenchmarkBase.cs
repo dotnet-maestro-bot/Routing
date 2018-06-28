@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,16 +27,17 @@ namespace Microsoft.AspNetCore.Routing.Matchers
         internal static MatcherEndpoint CreateEndpoint(string template)
         {
             return new MatcherEndpoint(
-               (next) => (context) => Task.CompletedTask,
-               template,
-               new RouteValueDictionary(),
-               new RouteValueDictionary(),
-               0,
-               EndpointMetadataCollection.Empty,
-               template);
+                (next) => (context) => Task.CompletedTask,
+                template,
+                new RouteValueDictionary(),
+                new RouteValueDictionary(),
+                new Dictionary<string, IEndpointMatchConstraint>(),
+                0,
+                EndpointMetadataCollection.Empty,
+                template);
         }
 
-        internal static  int[] SampleRequests(int endpointCount, int count)
+        internal static int[] SampleRequests(int endpointCount, int count)
         {
             // This isn't very high tech, but it's at least regular distribution.
             // We sort the route templates by precedence, so this should result in

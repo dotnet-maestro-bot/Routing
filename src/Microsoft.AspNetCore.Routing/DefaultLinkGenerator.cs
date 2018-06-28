@@ -61,7 +61,7 @@ namespace Microsoft.AspNetCore.Routing
 
             foreach (var endpoint in matcherEndpoints)
             {
-                link = GetLink(endpoint.ParsedTemplate, endpoint.Defaults, explicitValues, ambientValues);
+                link = GetLink(endpoint, explicitValues, ambientValues);
                 if (link != null)
                 {
                     return true;
@@ -72,16 +72,15 @@ namespace Microsoft.AspNetCore.Routing
         }
 
         private string GetLink(
-            RouteTemplate template,
-            RouteValueDictionary defaults,
+            MatcherEndpoint endpoint,
             RouteValueDictionary explicitValues,
             RouteValueDictionary ambientValues)
         {
             var templateBinder = new TemplateBinder(
                 UrlEncoder.Default,
                 _uriBuildingContextPool,
-                template,
-                defaults);
+                endpoint.ParsedTemplate,
+                endpoint.Defaults);
 
             var values = templateBinder.GetValues(ambientValues, explicitValues);
             if (values == null)
@@ -90,7 +89,13 @@ namespace Microsoft.AspNetCore.Routing
                 return null;
             }
 
-            //TODO: route constraint matching here
+            if (!RouteConstraintMatcher.Match(
+                endpoint.EndpointMatchConstraints,
+                values.CombinedValues,
+                _logger))
+            {
+                return null;
+            }
 
             return templateBinder.BindValues(values.AcceptedValues);
         }

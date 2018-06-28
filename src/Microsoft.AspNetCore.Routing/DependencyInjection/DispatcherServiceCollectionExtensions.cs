@@ -22,14 +22,10 @@ namespace Microsoft.Extensions.DependencyInjection
             }
 
             // Collect all data sources from DI.
-            services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<DispatcherOptions>, ConfigureDispatcherOptions>());
+            //services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<DispatcherOptions>, ConfigureDispatcherOptions>());
 
             // Allow global access to the list of endpoints.
-            services.TryAddSingleton<CompositeEndpointDataSource>(s =>
-            {
-                var options = s.GetRequiredService<IOptions<DispatcherOptions>>();
-                return new CompositeEndpointDataSource(options.Value.DataSources);
-            });
+            services.TryAddSingleton<CompositeEndpointDataSource>();
 
             //
             // Default matcher implementation

@@ -63,5 +63,42 @@ namespace Microsoft.AspNetCore.Routing
 
             return true;
         }
+
+        public static bool Match(
+            IDictionary<string, IEndpointMatchConstraint> constraints,
+            RouteValueDictionary routeValues,
+            ILogger logger)
+        {
+            if (routeValues == null)
+            {
+                throw new ArgumentNullException(nameof(routeValues));
+            }
+
+            if (logger == null)
+            {
+                throw new ArgumentNullException(nameof(logger));
+            }
+
+            if (constraints == null || constraints.Count == 0)
+            {
+                return true;
+            }
+
+            foreach (var kvp in constraints)
+            {
+                var constraint = kvp.Value;
+                if (!constraint.Match(kvp.Key, routeValues, RouteDirection.UrlGeneration))
+                {
+                    object routeValue;
+                    routeValues.TryGetValue(kvp.Key, out routeValue);
+
+                    logger.RouteValueDidNotSatisfyEndpointMatchConstraint(routeValue, kvp.Key, constraint);
+
+                    return false;
+                }
+            }
+
+            return true;
+        }
     }
 }

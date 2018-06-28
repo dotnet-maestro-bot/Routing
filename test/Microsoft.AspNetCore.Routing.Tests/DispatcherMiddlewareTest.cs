@@ -70,7 +70,7 @@ namespace Microsoft.AspNetCore.Routing
             var matcherFactory = new TestMatcherFactory(true);
             var middleware = new DispatcherMiddleware(
                 matcherFactory,
-                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>()),
+                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>(), Options.Create(new DispatcherOptions())),
                 logger,
                 next);
 
