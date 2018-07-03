@@ -14,13 +14,14 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace Microsoft.AspNetCore.Routing
 {
-    internal class RouteValuesBasedEndpointFinder : IEndpointFinder<RouteValuesBasedEndpointFinderContext>
+    internal class RouteValuesBasedEndpointFinder : IEndpointFinder<RouteValuesBasedEndpointFinderContext>, IDisposable
     {
         private readonly CompositeEndpointDataSource _endpointDataSource;
         private readonly IInlineConstraintResolver _inlineConstraintResolver;
         private readonly ObjectPool<UriBuildingContext> _objectPool;
         private LinkGenerationDecisionTree _allMatchesLinkGenerationTree;
         private IDictionary<string, LinkGenerationDecisionTree> _namedMatches;
+        private IDisposable _changeTokenCallback;
 
         public RouteValuesBasedEndpointFinder(
             CompositeEndpointDataSource endpointDataSource,
@@ -32,6 +33,13 @@ namespace Microsoft.AspNetCore.Routing
             _inlineConstraintResolver = inlineConstraintResolver;
 
             BuildOutboundMatches();
+
+            _changeTokenCallback = _endpointDataSource.ChangeToken.RegisterChangeCallback(
+                state =>
+                {
+                    BuildOutboundMatches();
+                },
+                state: null);
         }
 
         public IEnumerable<Endpoint> FindEndpoints(RouteValuesBasedEndpointFinderContext context)
@@ -67,7 +75,8 @@ namespace Microsoft.AspNetCore.Routing
             _allMatchesLinkGenerationTree = new LinkGenerationDecisionTree(allOutboundMatches.ToArray());
         }
 
-        private (IEnumerable<OutboundMatch>, IDictionary<string, List<OutboundMatch>>) GetOutboundMatches()
+        // To enable unit testing
+        internal (IEnumerable<OutboundMatch>, IDictionary<string, List<OutboundMatch>>) GetOutboundMatches()
         {
             var allOutboundMatches = new List<OutboundMatch>();
             var namedOutboundMatches = new Dictionary<string, List<OutboundMatch>>(StringComparer.OrdinalIgnoreCase);
@@ -134,6 +143,11 @@ namespace Microsoft.AspNetCore.Routing
             entry.Constraints = constraintBuilder.Build();
             entry.Defaults = endpoint.Defaults;
             return entry;
+        }
+        
+        public void Dispose()
+        {
+            _changeTokenCallback?.Dispose();
         }
 
         private IDictionary<string, LinkGenerationDecisionTree> GetNamedMatches(
