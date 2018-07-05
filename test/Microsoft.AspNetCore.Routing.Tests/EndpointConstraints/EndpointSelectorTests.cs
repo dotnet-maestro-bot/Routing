@@ -1,6 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing.Matchers;
 using Microsoft.AspNetCore.Routing.TestObjects;
@@ -8,11 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
-using Microsoft.Extensions.Options;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Routing.EndpointConstraints
@@ -417,9 +416,7 @@ namespace Microsoft.AspNetCore.Routing.EndpointConstraints
         {
             loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
 
-            var endpointDataSource = new CompositeEndpointDataSource(
-                new[] { new DefaultEndpointDataSource(actions) },
-                Options.Create(new DispatcherOptions()));
+            var endpointDataSource = new CompositeEndpointDataSource(new[] { new DefaultEndpointDataSource(actions) });
 
             var actionConstraintProviders = new IEndpointConstraintProvider[] {
                     new DefaultEndpointConstraintProvider(),
@@ -451,7 +448,7 @@ namespace Microsoft.AspNetCore.Routing.EndpointConstraints
         private static EndpointConstraintCache GetEndpointConstraintCache(IEndpointConstraintProvider[] actionConstraintProviders = null)
         {
             return new EndpointConstraintCache(
-                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>(), Options.Create(new DispatcherOptions())),
+                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>()),
                 actionConstraintProviders.AsEnumerable() ?? new List<IEndpointConstraintProvider>());
         }
 

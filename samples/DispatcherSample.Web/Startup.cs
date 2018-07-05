@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Matchers;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,13 @@ namespace DispatcherSample.Web
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddRouting();
+            services.AddTransient<EndsWithStringMatchProcessor>();
+
+            services.AddRouting(options =>
+            {
+                options.ConstraintMap.Add("endsWith", typeof(EndsWithStringMatchProcessor));
+            });
+
             services.AddDispatcher(options =>
             {
                 options.DataSources.Add(new DefaultEndpointDataSource(new[]
@@ -35,7 +42,7 @@ namespace DispatcherSample.Web
                         "/",
                         new RouteValueDictionary(),
                         new RouteValueDictionary(),
-                        new Dictionary<string, IEndpointMatchConstraint>(),
+                        new List<MatchProcessorReference>(),
                         0,
                         EndpointMetadataCollection.Empty,
                         "Home"),
@@ -51,10 +58,38 @@ namespace DispatcherSample.Web
                         "/plaintext",
                         new RouteValueDictionary(),
                         new RouteValueDictionary(),
-                        new Dictionary<string, IEndpointMatchConstraint>(),
+                        new List<MatchProcessorReference>(),
                         0,
                         EndpointMetadataCollection.Empty,
                         "Plaintext"),
+                    new MatcherEndpoint((next) => (httpContext) =>
+                        {
+                            var response = httpContext.Response;
+                            response.StatusCode = 200;
+                            response.ContentType = "text/plain";
+                            return response.WriteAsync("WithConstraints");
+                        },
+                        "/withconstraints/{id:endsWith(_001)}",
+                        new RouteValueDictionary(),
+                        new RouteValueDictionary(),
+                        new List<MatchProcessorReference>(),
+                        0,
+                        EndpointMetadataCollection.Empty,
+                        "withconstraints"),
+                    new MatcherEndpoint((next) => (httpContext) =>
+                        {
+                            var response = httpContext.Response;
+                            response.StatusCode = 200;
+                            response.ContentType = "text/plain";
+                            return response.WriteAsync("withoptionalconstraints");
+                        },
+                        "/withoptionalconstraints/{id:endsWith(_001)?}",
+                        new RouteValueDictionary(),
+                        new RouteValueDictionary(),
+                        new List<MatchProcessorReference>(),
+                        0,
+                        EndpointMetadataCollection.Empty,
+                        "withoptionalconstraints"),
                 }));
             });
         }

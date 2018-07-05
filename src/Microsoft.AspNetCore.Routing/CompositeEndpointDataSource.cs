@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace Microsoft.AspNetCore.Routing
@@ -17,17 +16,14 @@ namespace Microsoft.AspNetCore.Routing
         private IChangeToken _changeToken;
         private IReadOnlyList<Endpoint> _endpoints;
 
-        public CompositeEndpointDataSource(IEnumerable<EndpointDataSource> dataSources, IOptions<DispatcherOptions> options)
+        internal CompositeEndpointDataSource(IEnumerable<EndpointDataSource> dataSources)
         {
             if (dataSources == null)
             {
                 throw new ArgumentNullException(nameof(dataSources));
             }
 
-            var allDataSources = new List<EndpointDataSource>();
-            allDataSources.AddRange(dataSources);
-            allDataSources.AddRange(options.Value.DataSources);
-            _dataSources = allDataSources.ToArray();
+            _dataSources = dataSources.ToArray();
             _lock = new object();
         }
 

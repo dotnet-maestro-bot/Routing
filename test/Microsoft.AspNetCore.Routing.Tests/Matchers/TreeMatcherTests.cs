@@ -1,12 +1,14 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing.EndpointConstraints;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Moq;
 using Xunit;
 
 namespace Microsoft.AspNetCore.Routing.Matchers
@@ -20,7 +22,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                 (next) => null,
                 template, defaults,
                 new RouteValueDictionary(),
-                new Dictionary<string, IEndpointMatchConstraint>(),
+                new List<MatchProcessorReference>(),
                 order,
                 metadata ?? EndpointMetadataCollection.Empty,
                 template);
@@ -28,8 +30,11 @@ namespace Microsoft.AspNetCore.Routing.Matchers
 
         private TreeMatcher CreateTreeMatcher(EndpointDataSource endpointDataSource)
         {
-            var compositeDataSource = new CompositeEndpointDataSource(new[] { endpointDataSource }, Options.Create(new DispatcherOptions()));
-            var defaultInlineConstraintResolver = new DefaultInlineConstraintResolver(Options.Create(new RouteOptions()));
+            var compositeDataSource = new CompositeEndpointDataSource(new[] { endpointDataSource });
+            var defaultInlineConstraintResolver = new DefaultMatchProcessorFactory(
+                Options.Create(new RouteOptions()),
+                NullLogger<DefaultMatchProcessorFactory>.Instance,
+                Mock.Of<IServiceProvider>());
             var endpointSelector = new EndpointSelector(
                 compositeDataSource,
                 new EndpointConstraintCache(compositeDataSource, new IEndpointConstraintProvider[] { new DefaultEndpointConstraintProvider() }),

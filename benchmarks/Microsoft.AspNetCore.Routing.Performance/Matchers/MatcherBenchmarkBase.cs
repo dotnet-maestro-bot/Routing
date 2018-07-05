@@ -31,7 +31,7 @@ namespace Microsoft.AspNetCore.Routing.Matchers
                 template,
                 new RouteValueDictionary(),
                 new RouteValueDictionary(),
-                new Dictionary<string, IEndpointMatchConstraint>(),
+                new List<MatchProcessorReference>(),
                 0,
                 EndpointMetadataCollection.Empty,
                 template);

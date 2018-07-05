@@ -4,9 +4,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing.Matchers;
 using Microsoft.AspNetCore.Routing.TestObjects;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
@@ -70,7 +68,7 @@ namespace Microsoft.AspNetCore.Routing
             var matcherFactory = new TestMatcherFactory(true);
             var middleware = new DispatcherMiddleware(
                 matcherFactory,
-                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>(), Options.Create(new DispatcherOptions())),
+                new CompositeEndpointDataSource(Array.Empty<EndpointDataSource>()),
                 logger,
                 next);
 
