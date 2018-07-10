@@ -19,9 +19,18 @@ namespace DispatcherSample.Web
 
         public override bool Process(object value)
         {
+            if (value == null)
+            {
+                return false;
+            }
+
             var valueString = Convert.ToString(value, CultureInfo.InvariantCulture);
 
-            var endsWith = valueString.EndsWith(ConstraintArgument);
+            var endsWith = valueString.EndsWith(
+                ConstraintArgument,
+                ignoreCase: true,
+                culture: CultureInfo.InvariantCulture);
+
             if (!endsWith)
             {
                 _logger.LogDebug(
