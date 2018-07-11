@@ -14,11 +14,12 @@ using Microsoft.Extensions.ObjectPool;
 
 namespace Microsoft.AspNetCore.Routing
 {
-    internal class RouteValuesBasedEndpointFinder : IEndpointFinder<RouteValuesBasedEndpointFinderContext>
+    internal class RouteValuesBasedEndpointFinder : IEndpointFinder<RouteValuesBasedEndpointFinderContext>, IDisposable
     {
         private readonly CompositeEndpointDataSource _endpointDataSource;
         private readonly IInlineConstraintResolver _inlineConstraintResolver;
         private readonly ObjectPool<UriBuildingContext> _objectPool;
+        private IDisposable _changeCallback;
         private LinkGenerationDecisionTree _allMatchesLinkGenerationTree;
         private IDictionary<string, LinkGenerationDecisionTree> _namedMatches;
 
@@ -31,7 +32,11 @@ namespace Microsoft.AspNetCore.Routing
             _objectPool = objectPool;
             _inlineConstraintResolver = inlineConstraintResolver;
 
+            // Build initial matches
             BuildOutboundMatches();
+
+            // Register for changes in endpoints
+            RegisterCallback();
         }
 
         public IEnumerable<Endpoint> FindEndpoints(RouteValuesBasedEndpointFinderContext context)
@@ -60,14 +65,29 @@ namespace Microsoft.AspNetCore.Routing
                 .Select(match => (MatcherEndpoint)match.Entry.Data);
         }
 
-        private void BuildOutboundMatches()
+        private void RegisterCallback()
         {
-            var (allOutboundMatches, namedOutboundMatches) = GetOutboundMatches();
-            _namedMatches = GetNamedMatches(namedOutboundMatches);
-            _allMatchesLinkGenerationTree = new LinkGenerationDecisionTree(allOutboundMatches.ToArray());
+            _changeCallback = _endpointDataSource.ChangeToken.RegisterChangeCallback(
+                (state) =>
+                {
+                    // rebuild the matches
+                    BuildOutboundMatches();
+
+                    // re-register the callback as the change token is one time use only and a new change token
+                    // is produced every time
+                    RegisterCallback();
+                },
+                state: null);
         }
 
-        private (IEnumerable<OutboundMatch>, IDictionary<string, List<OutboundMatch>>) GetOutboundMatches()
+        private void BuildOutboundMatches()
+        {
+            var (allMatches, namedMatches) = GetOutboundMatches();
+            _namedMatches = GetNamedMatches(namedMatches);
+            _allMatchesLinkGenerationTree = new LinkGenerationDecisionTree(allMatches.ToArray());
+        }
+
+        protected virtual (IEnumerable<OutboundMatch>, IDictionary<string, List<OutboundMatch>>) GetOutboundMatches()
         {
             var allOutboundMatches = new List<OutboundMatch>();
             var namedOutboundMatches = new Dictionary<string, List<OutboundMatch>>(StringComparer.OrdinalIgnoreCase);
@@ -145,6 +165,11 @@ namespace Microsoft.AspNetCore.Routing
                 result.Add(namedOutboundMatch.Key, new LinkGenerationDecisionTree(namedOutboundMatch.Value.ToArray()));
             }
             return result;
+        }
+
+        public void Dispose()
+        {
+            _changeCallback?.Dispose();
         }
 
         // Used only to hook up link generation, and it doesn't need to do anything.

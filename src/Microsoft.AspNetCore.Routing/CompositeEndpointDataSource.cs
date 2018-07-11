@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Microsoft.Extensions.Primitives;
 
 namespace Microsoft.AspNetCore.Routing
@@ -12,9 +13,11 @@ namespace Microsoft.AspNetCore.Routing
     {
         private readonly EndpointDataSource[] _dataSources;
         private readonly object _lock;
-
-        private IChangeToken _changeToken;
         private IReadOnlyList<Endpoint> _endpoints;
+
+        private IChangeToken _dataSourcesChangeToken;
+        private IChangeToken _consumerChangeToken;
+        private CancellationTokenSource _cts;
 
         internal CompositeEndpointDataSource(IEnumerable<EndpointDataSource> dataSources)
         {
@@ -32,7 +35,7 @@ namespace Microsoft.AspNetCore.Routing
             get
             {
                 EnsureInitialized();
-                return _changeToken;
+                return _consumerChangeToken;
             }
         }
 
@@ -48,7 +51,7 @@ namespace Microsoft.AspNetCore.Routing
         // Defer initialization to avoid doing lots of reflection on startup.
         private void EnsureInitialized()
         {
-            if (_changeToken == null)
+            if (_dataSourcesChangeToken == null)
             {
                 Initialize();
             }
@@ -60,10 +63,20 @@ namespace Microsoft.AspNetCore.Routing
         {
             lock (_lock)
             {
-                _changeToken = new CompositeChangeToken(_dataSources.Select(d => d.ChangeToken).ToArray());
+                _cts = new CancellationTokenSource();
+                _consumerChangeToken = new CancellationChangeToken(_cts.Token);
+                _dataSourcesChangeToken = new CompositeChangeToken(_dataSources.Select(d => d.ChangeToken).ToArray());
                 _endpoints = _dataSources.SelectMany(d => d.Endpoints).ToArray();
 
-                _changeToken.RegisterChangeCallback((state) => Initialize(), null);
+                _dataSourcesChangeToken.RegisterChangeCallback(
+                    (state) =>
+                    {
+                        // raise consumer callbacks
+                        _cts.Cancel();
+
+                        Initialize();
+                    },
+                    state: null);
             }
         }
     }
